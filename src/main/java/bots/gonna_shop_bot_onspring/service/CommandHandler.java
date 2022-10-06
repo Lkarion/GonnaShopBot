@@ -8,8 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Message;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
 import java.util.*;
 
@@ -17,6 +15,9 @@ import java.util.*;
 public class CommandHandler {
     @Autowired
     private ProductRepository productRepository;
+    @Autowired
+    private ShowListHandler showListHandler;
+
     private final Map<Long, BotState> chatStateMap = new HashMap<>();
     private final Map<BotState, String> stateSendMessageMap = new HashMap<>();
 
@@ -36,7 +37,7 @@ public class CommandHandler {
                 return handleListChanging(message, BotState.GONNA_DELETE);
             }
             case "/show": {
-                return showList(message);
+                return showListHandler.showList(message);
             }
             default:
                 return generateAnswer("Choose any command", message.getChatId());
@@ -82,7 +83,6 @@ public class CommandHandler {
                     .isMarked(false)
                     .build();
             productRepository.save(product);
-            System.out.println(productName + " is added to your list");
             return generateAnswer(productName + " is added to your shopping list", message.getChatId());
         } else {
             return generateAnswer(productName + " already exists in your shopping list", message.getChatId());
@@ -97,52 +97,9 @@ public class CommandHandler {
         Product product = productRepository.findByName(productName);
         if (product != null) {
             productRepository.delete(product);
-            System.out.println("Product has been deleted from your shopping list");
             return generateAnswer("Product has been deleted from your shopping list", message.getChatId());
         }
         return generateAnswer("Product was not found in your shopping list", message.getChatId());
-    }
-
-    @SneakyThrows
-    public SendMessage showList(Message message) {
-
-        var shoppingList = productRepository.findAllByChatId(message.getChatId());
-
-        if (shoppingList.isEmpty()) {
-            return generateAnswer("Your shopping list is empty", message.getChatId());
-        }
-
-        List<List<InlineKeyboardButton>> buttons = new ArrayList<>();
-
-        shoppingList.forEach(System.out::println);
-
-        int i = 0;
-        while (i < shoppingList.size()) {
-            String p;
-            if (i == shoppingList.size() - 1) {
-                p = " ";
-            } else {
-                p = shoppingList.get(i + 1).getName();
-            }
-            buttons.add(
-                    Arrays.asList(
-                            InlineKeyboardButton.builder()
-                                    .text(shoppingList.get(i).getName())
-                                    .callbackData(shoppingList.get(i).getName())
-                                    .build(),
-                            InlineKeyboardButton.builder()
-                                    .text(p)
-                                    .callbackData(p)
-                                    .build())
-            );
-            i += 2;
-        }
-        return SendMessage.builder()
-                .text("Your List:")
-                .chatId(message.getChatId().toString())
-                .replyMarkup(InlineKeyboardMarkup.builder().keyboard(buttons).build())
-                .build();
-
     }
 
     private SendMessage generateAnswer(String text, Long chatId) {
